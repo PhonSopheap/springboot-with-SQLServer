@@ -1,0 +1,51 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  IMAGE_REGISTRY_CONNECTION: 'DockerHub'
+  IMAGE_REGISTRY: 's0pheap'
+  IMAGE_REPOSITORY: 'spring-api-demo'
+  TAG: '$(Build.BuildId)'
+
+stages:
+- stage: BuildApp
+  jobs: 
+  - job: BuildSpringBootAndPush
+    steps:
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '17'
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'PreInstalled'
+    - task: Maven@4
+      inputs:
+        mavenPomFile: 'pom.xml'
+        javaHomeOption: 'JDKVersion'
+        mavenVersionOption: 'Default'
+        mavenAuthenticateFeed: false
+        effectivePomSkip: false
+        sonarQubeRunAnalysis: false
+    - task: Docker@2
+      inputs:
+        containerRegistry: '$(IMAGE_REGISTRY_CONNECTION)'
+        repository: '$(IMAGE_REGISTRY)/$(IMAGE_REPOSITORY)'
+        command: 'buildAndPush'
+        Dockerfile: '**/Dockerfile'
+        tags: '$(TAG)'
+
+- stage: DeployApp
+  jobs: 
+  - job: DeploySpringBootApi
+    steps:
+    - task: AzureRmWebAppDeployment@4
+      inputs:
+        ConnectionType: 'AzureRM'
+        azureSubscription: 'demo-azure'
+        appType: 'webAppContainer'
+        WebAppName: 'azure-as-terraform'
+        DockerNamespace: '$(IMAGE_REGISTRY)' 
+        DockerRepository: '$(IMAGE_REPOSITORY)'
+        DockerImageTag: '$(TAG)'
